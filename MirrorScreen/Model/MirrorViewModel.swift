@@ -2,6 +2,7 @@ import AVFoundation
 import AppKit
 import Combine
 import CoreImage
+import ServiceManagement
 
 struct StreamStats: Equatable {
     var fps: Double = 0
@@ -19,6 +20,16 @@ final class MirrorViewModel: ObservableObject {
     @Published private(set) var stats = StreamStats()
     @Published private(set) var videoSize: CGSize = .zero
     @Published private(set) var toast: String?
+    @Published private(set) var zoom: CGFloat = 1
+    @Published private(set) var inspector: PixelInfo?
+
+    // Session-only tools, not remembered across launches.
+    @Published var frozen = false {
+        didSet { frameHub.setFrozen(frozen) }
+    }
+    @Published var inspectorEnabled = false {
+        didSet { if !inspectorEnabled { inspector = nil } }
+    }
 
     @Published var alwaysOnTop: Bool {
         didSet {
@@ -47,6 +58,44 @@ final class MirrorViewModel: ObservableObject {
             frameHub.setRenderingEnabled(renderMode == .frames)
         }
     }
+    @Published var presentationMode: Bool {
+        didSet {
+            defaults.set(presentationMode, forKey: Keys.presentationMode)
+            windowManager.setPresentationMode(presentationMode)
+        }
+    }
+    @Published var autoHideCursor: Bool {
+        didSet { defaults.set(autoHideCursor, forKey: Keys.autoHideCursor) }
+    }
+    @Published var gridStyle: GridStyle {
+        didSet { defaults.set(gridStyle.rawValue, forKey: Keys.gridStyle) }
+    }
+    @Published var roundedCorners: Bool {
+        didSet { defaults.set(roundedCorners, forKey: Keys.roundedCorners) }
+    }
+    @Published var backgroundStyle: BackgroundStyle {
+        didSet {
+            defaults.set(backgroundStyle.rawValue, forKey: Keys.backgroundStyle)
+            windowManager.setBackground(backgroundStyle.nsColor)
+        }
+    }
+    @Published var windowOpacity: Double {
+        didSet {
+            defaults.set(windowOpacity, forKey: Keys.windowOpacity)
+            windowManager.setOpacity(windowOpacity)
+        }
+    }
+    @Published var showMenuBarIcon: Bool {
+        didSet { defaults.set(showMenuBarIcon, forKey: Keys.showMenuBarIcon) }
+    }
+    @Published var notifyConnections: Bool {
+        didSet {
+            defaults.set(notifyConnections, forKey: Keys.notifyConnections)
+            if notifyConnections {
+                notifier.requestAuthorization()
+            }
+        }
+    }
     @Published var pixelFormat: PixelFormatPreference {
         didSet {
             defaults.set(pixelFormat.rawValue, forKey: Keys.pixelFormat)
@@ -62,6 +111,8 @@ final class MirrorViewModel: ObservableObject {
 
     private let monitor = DeviceMonitor()
     private let sleepBlocker = SleepBlocker()
+    private let notifier = ConnectionNotifier()
+    private weak var videoView: VideoLayerView?
     private let defaults = UserDefaults.standard
     private let ciContext = CIContext(options: [.cacheIntermediates: false])
     private var machine = MirrorStateMachine()
@@ -84,6 +135,15 @@ final class MirrorViewModel: ObservableObject {
         static let renderMode = "renderMode"
         static let pixelFormat = "pixelFormat"
         static let preferredDevice = "preferredDevice"
+        static let presentationMode = "presentationMode"
+        static let autoHideCursor = "autoHideCursor"
+        static let gridStyle = "gridStyle"
+        static let roundedCorners = "roundedCorners"
+        static let backgroundStyle = "backgroundStyle"
+        static let windowOpacity = "windowOpacity"
+        // Read by AppDelegate too.
+        static let showMenuBarIcon = "showMenuBarIcon"
+        static let notifyConnections = "notifyConnections"
     }
 
     private static let maxRetries = 5
@@ -97,6 +157,14 @@ final class MirrorViewModel: ObservableObject {
             Keys.stallTimeout: 3.0,
             Keys.renderMode: RenderMode.frames.rawValue,
             Keys.pixelFormat: PixelFormatPreference.bgra.rawValue,
+            Keys.presentationMode: false,
+            Keys.autoHideCursor: true,
+            Keys.gridStyle: GridStyle.none.rawValue,
+            Keys.roundedCorners: false,
+            Keys.backgroundStyle: BackgroundStyle.black.rawValue,
+            Keys.windowOpacity: 1.0,
+            Keys.showMenuBarIcon: false,
+            Keys.notifyConnections: false,
         ])
         alwaysOnTop = defaults.bool(forKey: Keys.alwaysOnTop)
         showStats = defaults.bool(forKey: Keys.showStats)
@@ -105,6 +173,14 @@ final class MirrorViewModel: ObservableObject {
         stallTimeout = defaults.double(forKey: Keys.stallTimeout)
         renderMode = RenderMode(rawValue: defaults.string(forKey: Keys.renderMode) ?? "") ?? .frames
         pixelFormat = PixelFormatPreference(rawValue: defaults.string(forKey: Keys.pixelFormat) ?? "") ?? .bgra
+        presentationMode = defaults.bool(forKey: Keys.presentationMode)
+        autoHideCursor = defaults.bool(forKey: Keys.autoHideCursor)
+        gridStyle = GridStyle(rawValue: defaults.string(forKey: Keys.gridStyle) ?? "") ?? GridStyle.none
+        roundedCorners = defaults.bool(forKey: Keys.roundedCorners)
+        backgroundStyle = BackgroundStyle(rawValue: defaults.string(forKey: Keys.backgroundStyle) ?? "") ?? .black
+        windowOpacity = defaults.double(forKey: Keys.windowOpacity)
+        showMenuBarIcon = defaults.bool(forKey: Keys.showMenuBarIcon)
+        notifyConnections = defaults.bool(forKey: Keys.notifyConnections)
 
         frameHub.setRenderingEnabled(renderMode == .frames)
         let hub = frameHub
@@ -127,12 +203,33 @@ final class MirrorViewModel: ObservableObject {
         return "MirrorScreen"
     }
 
+    /// One line describing the state, for the menu bar.
+    var statusLine: String {
+        switch phase {
+        case .needsPermission: return "In attesa del permesso"
+        case .permissionDenied: return "Accesso alla fotocamera negato"
+        case .waitingForDevice: return "Nessun iPad collegato"
+        case .connecting(let name): return "Connessione a \(name)…"
+        case .streaming(let name): return frozen ? "\(name): immagine congelata" : "\(name): in diretta"
+        case .stalled(let name): return "\(name): bloccato o fermo"
+        case .disconnected(let name): return "\(name) scollegato"
+        case .failed: return "Errore di cattura"
+        }
+    }
+
+    var menuBarSymbol: String {
+        phase.showsVideo ? "rectangle.inset.filled.on.rectangle" : "rectangle.on.rectangle"
+    }
+
     // MARK: Lifecycle
 
     func start() {
         guard !started else { return }
         started = true
         windowManager.setFloating(alwaysOnTop)
+        windowManager.setBackground(backgroundStyle.nsColor)
+        windowManager.setOpacity(windowOpacity)
+        windowManager.setPresentationMode(presentationMode)
         ScreenCaptureEnabler.enable()
         monitor.start()
         requestPermission()
@@ -145,8 +242,9 @@ final class MirrorViewModel: ObservableObject {
         }
     }
 
-    func attachRenderer(_ renderer: AVSampleBufferVideoRenderer) {
-        self.renderer = renderer
+    func attachVideoView(_ view: VideoLayerView) {
+        videoView = view
+        renderer = view.displayLayer.sampleBufferRenderer
         frameHub.setRenderer(renderer)
     }
 
@@ -224,6 +322,7 @@ final class MirrorViewModel: ObservableObject {
 
     private func connect(_ device: AVCaptureDevice) {
         activeDeviceID = device.uniqueID
+        frozen = false
         frameHub.reset()
         videoSize = .zero
         send(.connectRequested(deviceName: device.localizedName))
@@ -294,6 +393,53 @@ final class MirrorViewModel: ObservableObject {
         showToast("Schermata copiata negli appunti")
     }
 
+    // MARK: Tools
+
+    func zoomIn() { videoView?.setZoom(zoom * 1.25) }
+    func zoomOut() { videoView?.setZoom(zoom / 1.25) }
+    func resetZoom() { videoView?.setZoom(1) }
+
+    func zoomDidChange(_ value: CGFloat) {
+        zoom = value
+    }
+
+    func inspect(_ pixel: CGPoint?) {
+        guard inspectorEnabled, let pixel else {
+            inspector = nil
+            return
+        }
+        inspector = PixelInspector.info(in: frameHub.latestPixelBuffer(), x: Int(pixel.x), y: Int(pixel.y))
+    }
+
+    func copyColor(at pixel: CGPoint) {
+        let info = PixelInspector.info(in: frameHub.latestPixelBuffer(), x: Int(pixel.x), y: Int(pixel.y))
+        inspector = info
+        guard let hex = info.hex else {
+            showToast("Colore non disponibile (serve il formato BGRA)")
+            return
+        }
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(hex, forType: .string)
+        showToast("Colore \(hex) copiato")
+    }
+
+    var launchAtLogin: Bool {
+        SMAppService.mainApp.status == .enabled
+    }
+
+    func setLaunchAtLogin(_ on: Bool) {
+        do {
+            if on {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+        } catch {
+            showToast("Avvio al login non riuscito: \(error.localizedDescription)")
+        }
+        objectWillChange.send()
+    }
+
     func openCameraPrivacySettings() {
         if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Camera") {
             NSWorkspace.shared.open(url)
@@ -342,12 +488,26 @@ final class MirrorViewModel: ObservableObject {
     }
 
     private func send(_ event: MirrorEvent) {
+        let previous = phase
         let next = machine.handle(event)
-        if next != phase {
+        if next != previous {
             Log.ui.info("Phase: \(String(describing: next))")
             phase = next
+            notifyIfNeeded(from: previous, to: next)
         }
         updateSleepBlocker()
+    }
+
+    private func notifyIfNeeded(from previous: MirrorPhase, to next: MirrorPhase) {
+        guard notifyConnections, !NSApp.isActive else { return }
+        switch (previous, next) {
+        case (.connecting, .streaming(let name)):
+            notifier.post(title: "\(name) collegato", body: "Il mirroring è attivo.")
+        case (_, .disconnected(let name)):
+            notifier.post(title: "\(name) scollegato", body: "Il mirroring riprende quando lo ricolleghi.")
+        default:
+            break
+        }
     }
 
     private func updateSleepBlocker() {

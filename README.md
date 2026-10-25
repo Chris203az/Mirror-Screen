@@ -22,22 +22,34 @@ In alternativa, ogni build su GitHub Actions produce un artefatto `MirrorScreen.
 
 ## Funzioni
 
+Tutte le funzioni extra si possono spegnere dal menu Mirroring o dalle Impostazioni (⌘,), così è facile decidere quali tenere.
+
 | Funzione | Dove | Scorciatoia |
 | --- | --- | --- |
 | Mirroring automatico al collegamento | sempre attivo | |
 | Avviso di blocco o scollegamento, ripresa automatica | sempre attivo | |
 | Finestra in proporzione con l'iPad, anche dopo una rotazione | sempre attivo | |
-| Dimensione reale (un pixel dell'iPad per pixel dello schermo) | menu Mirroring | ⌘1 |
-| Adatta allo schermo | menu Mirroring | ⌘2 |
-| Schermo intero | menu Mirroring / Vista | ⌃⌘F |
-| Sempre in primo piano | menu Mirroring | ⇧⌘T |
-| Statistiche (risoluzione, fps, frame persi) | menu Mirroring | ⌘I |
-| Copia schermata negli appunti (niente su disco) | menu Mirroring | ⇧⌘C |
-| Riconnetti | menu Mirroring | ⌘R |
-| Scelta del dispositivo se ne colleghi più di uno | menu Mirroring › Dispositivo | |
-| Impedisce lo stop dello schermo durante il mirroring | Impostazioni | ⌘, |
-| Motore di visualizzazione alternativo e formato pixel (per i test) | Impostazioni | ⌘, |
-| Soglia per l'avviso di blocco | Impostazioni | ⌘, |
+| Dimensione finestra: 50%, 75%, reale, adatta allo schermo | Mirroring › Dimensione finestra | ⌘1, ⌘2 |
+| Schermo intero | Mirroring / Vista | ⌃⌘F |
+| Modalità presentazione: niente barra del titolo, finestra trascinabile dall'immagine | Mirroring, Impostazioni › Generale | ⇧⌘P |
+| Sempre in primo piano | Mirroring | ⇧⌘T |
+| Zoom nell'immagine: pizzico sul trackpad, ⌥ + scroll, trascina o scrolla per spostarti, doppio clic per tornare al 100% | Mirroring | ⌘=, ⌘-, ⌘0 |
+| Congela immagine (l'iPad continua, la finestra resta ferma) | Mirroring, barra dei menu | spazio |
+| Copia schermata negli appunti (niente su disco) | Mirroring | ⇧⌘C |
+| Ispettore pixel: coordinate in pixel e punti, colore esadecimale, clic per copiarlo | Mirroring | ⌥⌘I |
+| Griglia sovrapposta: terzi o griglia da 8 pt | Mirroring, Impostazioni › Aspetto | |
+| Angoli arrotondati come l'iPad | Mirroring, Impostazioni › Aspetto | |
+| Statistiche: risoluzione, formato, fps, frame persi | Mirroring, Impostazioni › Avanzate | ⌘I |
+| Riconnetti e scelta del dispositivo | Mirroring | ⌘R |
+| Sfondo nero, grigio scuro o bianco | Impostazioni › Aspetto | |
+| Opacità della finestra | Impostazioni › Aspetto | |
+| Cursore che si nasconde quando è fermo sull'immagine | Impostazioni › Aspetto | |
+| Impedisce lo stop dello schermo durante il mirroring | Impostazioni › Generale | |
+| Icona nella barra dei menu (chiudendo la finestra l'app resta attiva) | Impostazioni › Generale | |
+| Avvio al login | Impostazioni › Generale | |
+| Notifiche di collegamento e scollegamento quando l'app è in secondo piano | Impostazioni › Generale | |
+| Motore di visualizzazione alternativo e formato pixel (per i test) | Impostazioni › Avanzate | |
+| Soglia per l'avviso di blocco | Impostazioni › Avanzate | |
 
 ## Come funziona
 
@@ -59,3 +71,7 @@ Il piano tecnico completo è nel documento del progetto.
 - [ ] Con una schermata ferma (niente animazioni) l'avviso di blocco non compare per sbaglio; se compare, alzare la soglia o disattivarlo nelle Impostazioni
 - [ ] Scollegamento e ricollegamento del cavo
 - [ ] Confronto tra i due motori e i due formati pixel nelle Impostazioni
+- [ ] Zoom: resta nitido ingrandendo, si sposta bene con trackpad e mouse
+- [ ] Ispettore pixel: coordinate e colore corrispondono a quanto c'è sull'iPad
+- [ ] Modalità presentazione: la finestra si trascina dall'immagine, ⌘W la chiude
+- [ ] Per ogni funzione extra: tenerla o toglierla?

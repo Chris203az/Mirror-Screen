@@ -18,6 +18,7 @@ final class FrameHub: @unchecked Sendable {
     private let lock = NSLock()
     private var renderer: AVSampleBufferVideoRenderer?
     private var renderingEnabled = true
+    private var frozen = false
     private var lastFrameTime: CFTimeInterval = 0
     private var frameCount: UInt64 = 0
     private var dropCount: UInt64 = 0
@@ -34,6 +35,13 @@ final class FrameHub: @unchecked Sendable {
     func setRenderingEnabled(_ enabled: Bool) {
         lock.lock()
         renderingEnabled = enabled
+        lock.unlock()
+    }
+
+    /// While frozen the screen keeps the last image and snapshots/inspector read it; frames still count for stall detection.
+    func setFrozen(_ frozen: Bool) {
+        lock.lock()
+        self.frozen = frozen
         lock.unlock()
     }
 
@@ -65,10 +73,13 @@ final class FrameHub: @unchecked Sendable {
         let changed = size != .zero && size != dimensions
         lastFrameTime = CACurrentMediaTime()
         frameCount &+= 1
-        dimensions = size
-        pixelFormat = format
-        lastPixelBuffer = pixelBuffer
-        let target = renderingEnabled ? renderer : nil
+        let target = renderingEnabled && !frozen ? renderer : nil
+        if !frozen {
+            dimensions = size
+            pixelFormat = format
+            lastPixelBuffer = pixelBuffer
+        }
+        let notify = changed && !frozen
         lock.unlock()
 
         if let target {
@@ -81,7 +92,7 @@ final class FrameHub: @unchecked Sendable {
             }
         }
 
-        if changed {
+        if notify {
             DispatchQueue.main.async { [weak self] in
                 self?.onDimensionsChanged?(size)
             }

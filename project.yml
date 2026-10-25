@@ -36,6 +36,7 @@ targets:
     sources:
       - path: MirrorScreenTests
       - path: MirrorScreen/Model/MirrorStateMachine.swift
+      - path: MirrorScreen/Model/PixelInspector.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.chris203az.MirrorScreenTests
