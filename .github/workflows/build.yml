@@ -1,0 +1,45 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project MirrorScreen.xcodeproj \
+            -scheme MirrorScreen \
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY=- CODE_SIGNING_REQUIRED=NO
+
+      - name: Build release app
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project MirrorScreen.xcodeproj \
+            -scheme MirrorScreen \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM=
+          ditto -c -k --keepParent build/Build/Products/Release/MirrorScreen.app MirrorScreen.zip
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: MirrorScreen
+          path: MirrorScreen.zip
