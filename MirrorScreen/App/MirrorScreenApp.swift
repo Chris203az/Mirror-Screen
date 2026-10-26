@@ -19,7 +19,16 @@ struct MirrorScreenApp: App {
             SettingsView(model: model)
         }
 
-        MenuBarExtra("MirrorScreen", systemImage: model.menuBarSymbol, isInserted: $model.showMenuBarIcon) {
+        // SwiftUI writes isInserted back on every scene update; writing the @Published value each time
+        // re-triggers the update and spins forever, so only write real changes.
+        MenuBarExtra("MirrorScreen", systemImage: model.menuBarSymbol, isInserted: Binding(
+            get: { model.showMenuBarIcon },
+            set: { inserted in
+                if model.showMenuBarIcon != inserted {
+                    model.showMenuBarIcon = inserted
+                }
+            }
+        )) {
             MenuBarContent(model: model)
         }
     }
