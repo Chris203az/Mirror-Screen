@@ -1,0 +1,44 @@
+name: MirrorScreen
+options:
+  bundleIdPrefix: com.chris203az
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  developmentLanguage: it
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+targets:
+  MirrorScreen:
+    type: application
+    platform: macOS
+    sources:
+      - path: MirrorScreen
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chris203az.MirrorScreen
+        PRODUCT_NAME: MirrorScreen
+        INFOPLIST_FILE: MirrorScreen/Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: MirrorScreen/Resources/MirrorScreen.entitlements
+        ENABLE_HARDENED_RUNTIME: YES
+        CODE_SIGN_STYLE: Automatic
+        CODE_SIGN_IDENTITY: "-"
+        COMBINE_HIDPI_IMAGES: YES
+    scheme:
+      testTargets:
+        - MirrorScreenTests
+  MirrorScreenTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: MirrorScreenTests
+      - path: MirrorScreen/Model/MirrorStateMachine.swift
+      - path: MirrorScreen/Model/PixelInspector.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.chris203az.MirrorScreenTests
+        GENERATE_INFOPLIST_FILE: YES
+        CODE_SIGN_IDENTITY: "-"
