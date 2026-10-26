@@ -96,7 +96,8 @@ struct StatusView: View {
             case .needsPermission:
                 ProgressView().controlSize(.large)
                 title("Richiesta di accesso…")
-                detail("Consenti l'accesso alla fotocamera: macOS tratta l'iPad come una sorgente video.")
+                detail("Consenti l'accesso alla fotocamera: macOS tratta l'iPad come una sorgente video. Se non vedi la richiesta, attiva MirrorScreen in Impostazioni di Sistema › Privacy e sicurezza › Fotocamera.")
+                Button("Apri Impostazioni di Sistema") { model.openCameraPrivacySettings() }
 
             case .permissionDenied:
                 icon("lock.fill")

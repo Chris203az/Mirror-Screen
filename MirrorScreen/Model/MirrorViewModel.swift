@@ -268,6 +268,7 @@ final class MirrorViewModel: ObservableObject {
     }
 
     private func didGrantPermission() {
+        guard !permissionGranted else { return }
         permissionGranted = true
         send(.permissionGranted)
         connectPreferredIfIdle()
@@ -454,6 +455,14 @@ final class MirrorViewModel: ObservableObject {
     }
 
     private func checkFrames() {
+        // The request callback may never fire if the prompt was dismissed or the user
+        // granted access in System Settings meanwhile: poll the status until it is granted.
+        if !permissionGranted {
+            if AVCaptureDevice.authorizationStatus(for: .video) == .authorized {
+                didGrantPermission()
+            }
+            return
+        }
         let since = frameHub.snapshot().secondsSinceLastFrame
         switch phase {
         case .connecting, .stalled:
